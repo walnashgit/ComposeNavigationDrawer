@@ -3,10 +3,20 @@ package com.walnash.navigationdrawer
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material.*
+import androidx.compose.material.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigate
@@ -19,65 +29,99 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             NavigationDrawerTheme {
-                AppMainScreen()
+                CompositionLocalProvider(LocalBackPressedDispatcher provides this.onBackPressedDispatcher) {
+                    AppScaffold()
+                }
             }
         }
     }
 }
 
 @Composable
-fun AppMainScreen() {
+fun AppScaffold() {
+    val viewModel: MainViewModel = viewModel()
     val navController = rememberNavController()
-    Surface(color = MaterialTheme.colors.background) {
-        val drawerState = rememberDrawerState(DrawerValue.Closed)
-        val scope = rememberCoroutineScope()
-        val openDrawer = {
+    val scaffoldState = rememberScaffoldState()
+    val scope = rememberCoroutineScope()
+    val currentScreen by viewModel.currentScreen.observeAsState()
+
+    if (scaffoldState.drawerState.isOpen) {
+        BackPressHandler {
             scope.launch {
-                drawerState.open()
+                scaffoldState.drawerState.close()
             }
         }
-        ModalDrawer(
-            drawerState = drawerState,
-            gesturesEnabled = drawerState.isOpen,
-            drawerContent = {
-                Drawer(
-                    onDestinationClicked = { route ->
-                        scope.launch {
-                            drawerState.close()
-                        }
-                        navController.navigate(route) {
-                            popUpTo = navController.graph.startDestination
-                            launchSingleTop = true
-                        }
-                    }
-                )
+    }
+
+    var topBar : @Composable () -> Unit = {
+        TopBar(
+            title = currentScreen!!.title,
+            buttonIcon = Icons.Filled.Menu,
+            onButtonClicked = {
+                scope.launch {
+                    scaffoldState.drawerState.open()
+                }
             }
-        ) {
-            NavHost(
+        )
+    }
+    if (currentScreen == Screens.DrawerScreens.Help) {
+        topBar = {
+            TopBar(
+                title = Screens.DrawerScreens.Help.title,
+                buttonIcon = Icons.Filled.ArrowBack,
+                onButtonClicked = {
+                    navController.popBackStack()
+                }
+            )
+        }
+    }
+
+    val bottomBar: @Composable () -> Unit = {
+        if (currentScreen == Screens.DrawerScreens.Home || currentScreen is Screens.HomeScreens) {
+            BottomBar(
                 navController = navController,
-                startDestination = DrawerScreens.Home.route
-            ) {
-                composable(DrawerScreens.Home.route) {
-                    Home(
-                        openDrawer = {
-                            openDrawer()
-                        }
-                    )
+                screens = screensInHomeFromBottomNav
+            )
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            topBar()
+        },
+        bottomBar = {
+            bottomBar()
+        },
+        scaffoldState = scaffoldState,
+        drawerContent = {
+            Drawer { route ->
+                scope.launch {
+                    scaffoldState.drawerState.close()
                 }
-                composable(DrawerScreens.Account.route) {
-                    Account(
-                        openDrawer = {
-                            openDrawer()
-                        }
-                    )
-                }
-                composable(DrawerScreens.Help.route) {
-                    Help(
-                        navController = navController
-                    )
+                navController.navigate(route) {
+                    popUpTo = navController.graph.startDestination
+                    launchSingleTop = true
                 }
             }
-        }
+        },
+        drawerGesturesEnabled = scaffoldState.drawerState.isOpen,
+    ) { innerPadding ->
+        NavigationHost(navController = navController, viewModel = viewModel)
+    }
+}
+
+@Composable
+fun NavigationHost(navController: NavController, viewModel: MainViewModel) {
+    NavHost(
+        navController = navController as NavHostController,
+        startDestination = Screens.DrawerScreens.Home.route
+    ) {
+        composable(Screens.DrawerScreens.Home.route) { Home(viewModel = viewModel) }
+        composable(Screens.HomeScreens.Favorite.route) { Favorite(viewModel = viewModel) }
+        composable(Screens.HomeScreens.Notification.route) { Notification(viewModel = viewModel) }
+        composable(Screens.HomeScreens.MyNetwork.route) { MyNetwork(viewModel = viewModel) }
+        composable(Screens.DrawerScreens.Account.route) { Account(viewModel = viewModel) }
+        composable(Screens.DrawerScreens.Help.route) { Help(viewModel = viewModel) }
     }
 }
 
@@ -85,6 +129,6 @@ fun AppMainScreen() {
 @Composable
 fun DefaultPreview() {
     NavigationDrawerTheme {
-        AppMainScreen()
+        AppScaffold()
     }
 }

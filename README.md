@@ -1,4 +1,5 @@
-An easy sample to explore navigation component and navigation drawer from Jetpack compose.
+Sample to explore Navigation Drawer and Bottom Navigation created inside a Scaffold in Jetpack compose.
+The sample also explores saving state across different composables.
 
 
-![Alt text](/NavigationDrawer1.gif?raw=true)
+![Alt text](/ScaffoldNState.gif?raw=true)
